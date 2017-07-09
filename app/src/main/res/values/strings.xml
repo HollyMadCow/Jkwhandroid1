@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">Jkwh</string>
+    <string name="app_name">监控维护</string>
+    <string name="back">返回</string>
+    <string name="find">搜索</string>
+    <string name="findhint">点位名称或编号</string>
+    <string name="savepoint">存</string>
 </resources>

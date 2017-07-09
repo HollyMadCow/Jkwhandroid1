@@ -1,14 +1,23 @@
 package com.yhwjdd.hollywin.jkwh;
 
 import android.app.Activity;
+import android.app.Application;
+import android.app.DownloadManager;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 
 import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.BitmapDescriptor;
+import com.baidu.mapapi.map.MapStatus;
 import com.baidu.mapapi.map.MapStatusUpdate;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
@@ -22,12 +31,26 @@ import com.baidu.location.Poi;
 import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.model.LatLng;
 
+import java.io.IOException;
 import java.util.List;
+import com.alibaba.fastjson.*;
 
-public class MainActivity extends Activity {
-//    public BDLocationListener myListener = new MyLocationListener();
-//    public MapView mapView = null;
+import okhttp3.*;
+
+
+
+
+
+public class MainActivity extends AppCompatActivity {
+    public CustomApplication app;
     public BaiduMap baiduMap = null;
+    private Button bt;
+    private Button bs;
+    private EditText ed;
+    BDLocation shardedlocal;
+    OkHttpClient okHttpClient = OkHttpUtils.getInstance().getOkHttpClient();
+
+
 
     // 定位相關聲明
     public LocationClient locationClient = null;
@@ -35,22 +58,22 @@ public class MainActivity extends Activity {
     BitmapDescriptor mCurrentMarker = null;
     boolean isFirstLoc = true;// 是否首次定位
     MapView mMapView = null;
-//    private LocationClient mLocationClient = null;
 
-//    private Button startLocation;
-//    private MapView mapView;
-//    private BaiduMap mBaiduMap;
+    private static int LOCATION_COUTNS = 0;
 
     public BDLocationListener myListener = new BDLocationListener() {
+
         @Override
         public void onConnectHotSpotMessage(String s, int i) {
 
         }
+
+
         @Override
         public void onReceiveLocation(BDLocation location) {
             if (location == null || mMapView == null)
                 return;
-
+            shardedlocal = location;
             MyLocationData locData = new MyLocationData.Builder()
                     .accuracy(location.getRadius())
                     // 此處設置開發者獲取到的方向信息，順時針0-360
@@ -68,14 +91,58 @@ public class MainActivity extends Activity {
                 MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll, 16);    //設置地圖中心點以及縮放級別
                 baiduMap.animateMapStatus(u);
             }
+
+            StringBuffer sb = new StringBuffer(256);
+            sb.append("Time : ");
+            sb.append(location.getTime());
+            sb.append("\nError code : ");
+            sb.append(location.getLocType());
+            sb.append("\nLatitude : ");
+            sb.append(location.getLatitude());
+            sb.append("\nLontitude : ");
+            sb.append(location.getLongitude());
+            sb.append("\nRadius : ");
+            sb.append(location.getRadius());
+            if (location.getLocType() == BDLocation.TypeGpsLocation){
+                sb.append("\nSpeed : ");
+                sb.append(location.getSpeed());
+                sb.append("\nSatellite : ");
+                sb.append(location.getSatelliteNumber());
+            } else if (location.getLocType() == BDLocation.TypeNetWorkLocation){
+                sb.append("\nAddress : ");
+                sb.append(location.getAddrStr());
+            }
+            LOCATION_COUTNS ++;
+            sb.append("\n检查位置更新次数：");
+            sb.append(String.valueOf(LOCATION_COUTNS));
+
+            Log.v("!!!!",sb.toString());
         }
     };
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         SDKInitializer.initialize(getApplicationContext());
         setContentView(R.layout.activity_main);
+        app = (CustomApplication) getApplication();
+//        Log.i("FirstActivity", "初始值=====" + app.getValue()); // 获取进程中的全局变量值，看是否是初始化值
+//        app.setValue("Harvey Ren"); // 重新设置值
+//        Log.i("FirstActivity", "修改后=====" + app.getValue());
+//        OkHttpClient okHttpClient = OkHttpUtils.getInstance().getOkHttpClient();
+
+
+
         //获取地图控件引用
+        bt = (Button)findViewById(R.id.btnback) ;
+        bs = (Button)findViewById(R.id.btnsearch);
+        bt.setOnClickListener(new MyListener());
+        bs.setOnClickListener(new MySearch());
+        ed = (EditText)findViewById(R.id.editText);
+        ed.setOnEditorActionListener(new editactivate());
+       // ed.setOnClickListener(new clickactivate());
         mMapView = (MapView) findViewById(R.id.bmapView);
         baiduMap = mMapView.getMap();
         //開啟定位圖層
@@ -86,6 +153,9 @@ public class MainActivity extends Activity {
         this.setLocationOption();	//設置定位參數
         locationClient.start(); // 開始定位
     }
+
+
+
     private void setLocationOption() {
         LocationClientOption option = new LocationClientOption();
         option.setOpenGps(true); // 打開GPS
@@ -135,6 +205,134 @@ public class MainActivity extends Activity {
 //
 //        locationClient.setLocOption(option);
     }
+
+
+    class MyListener implements View.OnClickListener {
+
+        @Override
+        public void onClick(View v) {
+
+            LatLng ll = new LatLng(shardedlocal.getLatitude(),
+                    shardedlocal.getLongitude());
+            MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll,16);    //設置地圖中心點以及縮放級別
+            baiduMap.animateMapStatus(u);
+        }
+    }
+    class MySearch implements View.OnClickListener {
+
+        @Override
+        public void onClick(View v) {
+            //EditText editText = (EditText)findViewById(R.id.editText);
+            String domainip = app.getdomainip();
+            String s = domainip + "getpointinfo/"+ed.getText().toString();
+            Request request = new Request.Builder().
+                    get().
+                    url(s).
+                    build();
+
+           request = addBasicAuthHeaders(request);
+
+            okHttpClient.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    final String string = response.body().string();
+//                        Log.i(TAG, "onResponse: "+string);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+
+//                            java.lang.reflect.Type type = new TypeToken<PointBean>() {}.getType();
+                            PointBean point = JSON.parseObject(string,PointBean.class);
+                            //Log.i("TTEST",string);
+                            if (point.getState().equals("ok"))
+                            {
+                                //Log.d("TAG111","response"+ point.getInfo().getArea());
+                                Log.d("TAG111","response:"+ point.getMsg());
+                            }
+
+                            if (point.getState().equals("fail"))
+                            {
+                                //Log.d("TAG111","response"+ point.getInfo().getArea());
+                                Log.d("TAG111","response:"+ point.getMsg());
+                            }
+
+                        }
+                    });
+                }
+            });
+//
+        }
+    }
+
+    class editactivate implements TextView.OnEditorActionListener{
+        @Override
+        public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+            //当actionId == XX_SEND 或者 XX_DONE时都触发
+            //或者event.getKeyCode == ENTER 且 event.getAction == ACTION_DOWN时也触发
+            //注意，这是一定要判断event != null。因为在某些输入法上会返回null。
+            if (actionId == EditorInfo.IME_ACTION_SEND
+                    || actionId == EditorInfo.IME_ACTION_DONE
+                    || (event != null && KeyEvent.KEYCODE_ENTER == event.getKeyCode() && KeyEvent.ACTION_DOWN == event.getAction())) {
+               // EditText editText = (EditText)findViewById(R.id.editText);
+                String domainip = app.getdomainip();
+                String s = domainip + "getpointinfo/"+ed.getText().toString();
+                Request request = new Request.Builder().
+                        get().
+                        url(s).
+                        build();
+
+                request = addBasicAuthHeaders(request);
+
+                okHttpClient.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        final String string = response.body().string();
+//                        Log.i(TAG, "onResponse: "+string);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+
+//                            java.lang.reflect.Type type = new TypeToken<PointBean>() {}.getType();
+                                PointBean point = JSON.parseObject(string,PointBean.class);
+                                //Log.i("TTEST",string);
+                                if (point.getState().equals("ok"))
+                                {
+                                    //Log.d("TAG111","response"+ point.getInfo().getArea());
+                                    Log.d("TAG111","response:"+ point.getMsg());
+                                }
+                                if (point.getState().equals("fail"))
+                                {
+                                    //Log.d("TAG111","response"+ point.getInfo().getArea());
+                                    Log.d("TAG111","response:"+ point.getMsg());
+                                }
+
+                            }
+                        });
+                    }
+                });
+            }
+            return false;
+        }
+    }
+
+    private Request addBasicAuthHeaders(Request request) {
+        final String login = "zlwh2y";
+        final String password = "zlw2551";
+        String credential = Credentials.basic(login, password);
+        return request.newBuilder().header("Authorization", credential).build();
+    }
+
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
