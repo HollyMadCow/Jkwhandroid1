@@ -2,10 +2,15 @@ package com.yhwjdd.hollywin.jkwh;
 
 import android.app.Activity;
 import android.app.Application;
+import android.app.Dialog;
 import android.app.DownloadManager;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -46,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
     public BaiduMap baiduMap = null;
     private Button bt;
     private Button bs;
+    private Button btnsavecurrent;
     private EditText ed;
     BDLocation shardedlocal;
     OkHttpClient okHttpClient = OkHttpUtils.getInstance().getOkHttpClient();
@@ -74,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
             if (location == null || mMapView == null)
                 return;
             shardedlocal = location;
+            app.setShardedlocal(location);
             MyLocationData locData = new MyLocationData.Builder()
                     .accuracy(location.getRadius())
                     // 此處設置開發者獲取到的方向信息，順時針0-360
@@ -138,6 +145,8 @@ public class MainActivity extends AppCompatActivity {
         //获取地图控件引用
         bt = (Button)findViewById(R.id.btnback) ;
         bs = (Button)findViewById(R.id.btnsearch);
+        btnsavecurrent = (Button)findViewById(R.id.btnsavecurrentpoint);
+        btnsavecurrent.setOnClickListener(new SaveCurrentPoint());
         bt.setOnClickListener(new MyListener());
         bs.setOnClickListener(new MySearch());
         ed = (EditText)findViewById(R.id.editText);
@@ -161,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
         option.setOpenGps(true); // 打開GPS
         option.setLocationMode(LocationClientOption.LocationMode.Hight_Accuracy);// 設置定位模式
         option.setCoorType("bd09ll"); // 返回的定位結果是百度經緯度,默認值gcj02
-        option.setScanSpan(5000); // 設置發起定位請求的間隔時間為5000ms
+        option.setScanSpan(10000); // 設置發起定位請求的間隔時間為5000ms
         option.setIsNeedAddress(true); // 返回的定位結果包含地址信息
         option.setNeedDeviceDirect(true); // 返回的定位結果包含手機機頭的方向
 
@@ -218,53 +227,68 @@ public class MainActivity extends AppCompatActivity {
             baiduMap.animateMapStatus(u);
         }
     }
+    class SaveCurrentPoint implements View.OnClickListener {
+
+        @Override
+        public void onClick(View v) {
+            Intent intent=new Intent();
+            //setClass的第一个参数为Context对象（Activity为其子类），第二个参数为要启动的Activity
+            intent.setClass(MainActivity.this,SavePointActivity.class);
+            startActivity(intent);
+        }
+    }
     class MySearch implements View.OnClickListener {
 
         @Override
         public void onClick(View v) {
             //EditText editText = (EditText)findViewById(R.id.editText);
-            String domainip = app.getdomainip();
-            String s = domainip + "getpointinfo/"+ed.getText().toString();
-            Request request = new Request.Builder().
-                    get().
-                    url(s).
-                    build();
+            if (!TextUtils.isEmpty(ed.getText())){
+                String domainip = app.getdomainip();
+                String s = domainip + "getpointinfo/"+ed.getText().toString();
+                Request request = new Request.Builder().
+                        get().
+                        url(s).
+                        build();
 
-           request = addBasicAuthHeaders(request);
+                request = addBasicAuthHeaders(request);
 
-            okHttpClient.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
+                okHttpClient.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
 
-                }
+                    }
 
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    final String string = response.body().string();
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        final String string = response.body().string();
 //                        Log.i(TAG, "onResponse: "+string);
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
 
 //                            java.lang.reflect.Type type = new TypeToken<PointBean>() {}.getType();
-                            PointBean point = JSON.parseObject(string,PointBean.class);
-                            //Log.i("TTEST",string);
-                            if (point.getState().equals("ok"))
-                            {
-                                //Log.d("TAG111","response"+ point.getInfo().getArea());
-                                Log.d("TAG111","response:"+ point.getMsg());
-                            }
+                                PointBean point = JSON.parseObject(string,PointBean.class);
+                                //Log.i("TTEST",string);
+                                if (point.getState().equals("ok"))
+                                {
+                                    //Log.d("TAG111","response"+ point.getInfo().getArea());
+                                    Log.d("TAG111","response:"+ point.getMsg());
+                                }
 
-                            if (point.getState().equals("fail"))
-                            {
-                                //Log.d("TAG111","response"+ point.getInfo().getArea());
-                                Log.d("TAG111","response:"+ point.getMsg());
-                            }
+                                if (point.getState().equals("fail"))
+                                {
+                                    //Log.d("TAG111","response"+ point.getInfo().getArea());
+                                    Log.d("TAG111","response:"+ point.getMsg());
+                                }
 
-                        }
-                    });
-                }
-            });
+                            }
+                        });
+                    }
+                });
+            }else {
+                alarm();
+            }
+
 //
         }
     }
@@ -332,7 +356,22 @@ public class MainActivity extends AppCompatActivity {
         return request.newBuilder().header("Authorization", credential).build();
     }
 
+    protected  void alarm(){
+        Dialog alertDialog = new AlertDialog.Builder(this).
+                setTitle("无点位编号！").
+                setMessage("请输入点位编号。").
+                setIcon(R.drawable.timg).
+                setPositiveButton("确定", new DialogInterface.OnClickListener() {
 
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // TODO Auto-generated method stub
+
+                    }
+                }).
+                create();
+        alertDialog.show();
+    }
     @Override
     protected void onDestroy() {
         super.onDestroy();

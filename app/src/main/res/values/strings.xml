@@ -4,4 +4,7 @@
     <string name="find">搜索</string>
     <string name="findhint">点位名称或编号</string>
     <string name="savepoint">存</string>
+    <string name="savecurrentpoint">保存当前位置</string>
+    <string name="title_activity_second">保存位置</string>
+
 </resources>

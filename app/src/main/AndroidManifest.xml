@@ -44,6 +44,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".SavePointActivity"
+            android:label="@string/title_activity_second" >
+        </activity>
         <meta-data
             android:name="com.baidu.lbsapi.API_KEY"
             android:value="lawpRcaIIeAqEswkwujr0hRk6ifn5M8i" />
