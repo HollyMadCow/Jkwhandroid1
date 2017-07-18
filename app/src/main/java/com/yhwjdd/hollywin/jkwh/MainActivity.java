@@ -156,6 +156,7 @@ public class MainActivity extends AppCompatActivity {
         baiduMap = mMapView.getMap();
         //開啟定位圖層
         baiduMap.setMyLocationEnabled(true);
+        baiduMap.setMapType(BaiduMap.MAP_TYPE_SATELLITE);
 
         locationClient = new LocationClient(getApplicationContext()); // 實例化LocationClient類
         locationClient.registerLocationListener(myListener); // 注冊監聽函數
